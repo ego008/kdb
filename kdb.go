@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/errors"
+	"github.com/syndtr/goleveldb/leveldb/filter"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"github.com/syndtr/goleveldb/leveldb/util"
 	"math"
@@ -32,6 +33,11 @@ type (
 
 // Open creates/opens a DB at specified path, and returns a DB enclosing the same.
 func Open(dbPath string, o *opt.Options) (*DB, error) {
+	if o == nil {
+		o = &opt.Options{
+			Filter: filter.NewBloomFilter(10), // 一般取10
+		}
+	}
 	database, err := leveldb.OpenFile(dbPath, o)
 	if err != nil {
 		if errors.IsCorrupted(err) {
@@ -99,7 +105,7 @@ func (d *DB) HMGet(name []byte, keys [][]byte) ([][]byte, error) {
 	if keysLen == 0 {
 		return [][]byte{}, errors.New("keys len must > 0")
 	}
-	var kvs [][]byte
+	kvs := make([][]byte, 0, keysLen*2)
 	keyPrefix := SCC([]byte{PrefixH, byte(len(name))}, name)
 	d.callCount.Add(1)
 	for _, key := range keys {
@@ -213,7 +219,7 @@ func (d *DB) HScan(name, keyStart []byte, limit int) ([][]byte, error) {
 	}
 
 	n := 0
-	var kvs [][]byte
+	kvs := make([][]byte, 0, limit*2)
 
 	d.callCount.Add(1)
 	defer d.callCount.Add(-1)
@@ -253,7 +259,7 @@ func (d *DB) HPrefix(name, prefix []byte, limit int) ([][]byte, error) {
 	}
 
 	n := 0
-	var kvs [][]byte
+	kvs := make([][]byte, 0, limit*2)
 
 	d.callCount.Add(1)
 	defer d.callCount.Add(-1)
@@ -294,7 +300,7 @@ func (d *DB) HRScan(name, keyStart []byte, limit int) ([][]byte, error) {
 	}
 
 	n := 0
-	var kvs [][]byte
+	kvs := make([][]byte, 0, limit*2)
 
 	d.callCount.Add(1)
 	defer d.callCount.Add(-1)
@@ -469,7 +475,7 @@ func (d *DB) ZMGet(name []byte, keys [][]byte) ([][]byte, error) {
 	keyPrefix := SCC([]byte{PrefixZS, byte(len(name))}, name)
 	var n int
 
-	var kvs [][]byte
+	kvs := make([][]byte, 0, len(keys)*2)
 
 	d.callCount.Add(1)
 	for _, key := range keys {
@@ -523,7 +529,7 @@ func (d *DB) ZScan(name, keyStart, scoreStart []byte, limit int) ([][]byte, erro
 	sliceRange.Start = realKey
 
 	n := 0
-	var kvs [][]byte
+	kvs := make([][]byte, 0, limit*2)
 
 	d.callCount.Add(1)
 	defer d.callCount.Add(-1)
@@ -568,7 +574,7 @@ func (d *DB) ZRScan(name, keyStart, scoreStart []byte, limit int) ([][]byte, err
 	sliceRange.Limit = realKey
 
 	n := 0
-	var kvs [][]byte
+	kvs := make([][]byte, 0, limit*2)
 
 	d.callCount.Add(1)
 	defer d.callCount.Add(-1)
@@ -652,11 +658,10 @@ func SCC[T any](ss ...[]T) []T {
 		totalLen += len(ss[i])
 	}
 
-	result := make([]T, totalLen)
+	result := make([]T, 0, totalLen)
 
-	var j int
 	for i := 0; i < slicesLen; i++ {
-		j += copy(result[j:], ss[i])
+		result = append(result, ss[i]...)
 	}
 
 	return result
