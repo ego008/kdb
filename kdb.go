@@ -615,15 +615,17 @@ type sliceHeader struct {
 }
 
 func S2B(s string) []byte {
-	return *(*[]byte)(unsafe.Pointer(&sliceHeader{
-		data: (*stringHeader)(unsafe.Pointer(&s)).data,
-		len:  len(s),
-		cap:  len(s),
-	}))
+	return unsafe.Slice(unsafe.StringData(s), len(s))
+	//return *(*[]byte)(unsafe.Pointer(&sliceHeader{
+	//	data: (*stringHeader)(unsafe.Pointer(&s)).data,
+	//	len:  len(s),
+	//	cap:  len(s),
+	//}))
 }
 
 func B2S(b []byte) string {
-	return *(*string)(unsafe.Pointer(&b))
+	return unsafe.String(unsafe.SliceData(b), len(b))
+	//return *(*string)(unsafe.Pointer(&b))
 }
 
 func I2B32(v uint32) []byte {
